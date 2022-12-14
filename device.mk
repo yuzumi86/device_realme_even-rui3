@@ -289,6 +289,7 @@ PRODUCT_PACKAGES += \
     meta_init.rc \
     multi_init.rc \
     fstab.mt6768 \
+    fstab.mt6768_ramdisk \
     ueventd.mtk.rc \
     ueventd.oplus.rc
 
