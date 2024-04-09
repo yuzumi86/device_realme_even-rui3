@@ -327,7 +327,7 @@ PRODUCT_PACKAGES += \
     android.hardware.soundtrigger@2.3-impl
 
 # Shipping API level
-PRODUCT_SHIPPING_API_LEVEL := 29
+PRODUCT_SHIPPING_API_LEVEL := 30
 
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += \
