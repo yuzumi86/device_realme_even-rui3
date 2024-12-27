@@ -14,6 +14,8 @@ $(call inherit-product, device/realme/even/device.mk)
 
 # Inherit some common LineageOS stuff.
 $(call inherit-product, vendor/aosp/config/common_full_phone.mk)
+#Common
+TARGET_BOOT_ANIMATION_RES := 1080
 
 PRODUCT_NAME := aosp_even
 PRODUCT_DEVICE := even
