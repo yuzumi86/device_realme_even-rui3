@@ -1,19 +1,21 @@
 # MTK platform .rc configure
 
-import /vendor/etc/init/hw/init.connectivity.rc
-import /vendor/etc/init/hw/init.mt6768.usb.rc
+import ${ro.vendor.rc}init.connectivity.rc
+import ${ro.vendor.rc}init.mt6768.usb.rc
 import /vendor/etc/init/hw/init.project.rc
 import /system_ext/etc/init/hw/init.aee.rc
 import /FWUpgradeInit.rc
 import /vendor/etc/init/hw/init.aee.rc
-import /vendor/etc/init/hw/init.volte.rc
-import /vendor/etc/init/hw/init.mal.rc
-import /vendor/etc/init/hw/init.sensor_1_0.rc
+import ${ro.vendor.rc}init.volte.rc
+import ${ro.vendor.rc}init.mal.rc
+import ${ro.vendor.rc}init.sensor_1_0.rc
+#import ${ro.vendor.rc}init.ago.rc
 import /vendor/etc/init/hw/init.stnfc.rc
 import /system/etc/init/hw/init.stnfc.rc
+import ${ro.vendor.rc}init.cgroup.rc
 
 # init.modem.rc must be the LAST rc file because vold.post_fs_data_done is set in it
-import /vendor/etc/init/hw/init.modem.rc
+import ${ro.vendor.rc}init.modem.rc
 # *** DO NOT import the new rc file after this line ***
 
 on early-init
@@ -47,8 +49,8 @@ on init
 # update cpus for cpuset cgroup
     write /dev/cpuset/foreground/cpus 0-7
     write /dev/cpuset/foreground/boost/cpus 0-7
-    write /dev/cpuset/background/cpus 0-5
-    write /dev/cpuset/system-background/cpus 0-5
+    write /dev/cpuset/background/cpus 0-3
+    write /dev/cpuset/system-background/cpus 0-3
     write /dev/cpuset/top-app/cpus 0-7
 
 on late-init
@@ -108,7 +110,13 @@ on early-fs
     write /proc/bootprof "INIT:early-fs"
 
 #ifdef OPLUS_FEATURE_ZRAM_OPT
-service swap_enable_init /vendor/bin/sh /vendor/bin/swap_enable.sh
+service swap_enable_init /vendor/bin/sh /vendor/bin/swap_enable.sh configure_memory_parameters
+    user root
+    group system
+    disabled
+    oneshot
+
+service readahead_init /vendor/bin/sh /vendor/bin/swap_enable.sh configure_read_ahead_kb_values
     user root
     disabled
     oneshot
@@ -127,21 +135,20 @@ on fs
 
     write /sys/block/zram0/comp_algorithm lz4
     write /proc/sys/vm/page-cluster 0
-    write /proc/sys/vm/swappiness 100
+    write /proc/sys/vm/swappiness 160
     write /sys/kernel/mm/swap/vma_ra_enabled false
-    swapon_all /vendor/etc/fstab.mt6768
+#ifdef OPLUS_FEATURE_ZRAM_OPT
+#zhenxi.wei@BSP.Kernel.Performance, 2020/10/30, modify for setting zram size according to totalram size
+    chmod +x /vendor/bin/swap_enable.sh
+    start swap_enable_init
+#else
+    #swapon_all /vendor/fstab.enableswap
+#endif
 
     mount iso9660 loop@/vendor/etc/iAmCdRom.iso /mnt/cd-rom ro
 
 on post-fs
     write /proc/bootprof "INIT:post-fs"
-
-    # boot perf. tune
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "0 100"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "1 100"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "2 100"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "3 100"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/sched_stune_task_thresh 0
 
     # Support legacy paths
     symlink /sdcard /storage/sdcard0
@@ -224,10 +231,6 @@ on post-fs-data
     chown root system /mnt/vendor/nvdata
     chmod 0771 /mnt/vendor/nvdata
     mkdir /mnt/vendor/nvdata/media 0771 media audio
-
-    # AudioDump
-    mkdir /data/vendor/audiohal 0771 system audio
-    mkdir /data/vendor/audiohal/audio_param 0771 system audio
 
     #Create cct mount point
     mkdir /mnt/vendor/cct
@@ -340,11 +343,15 @@ on post-fs-data
     setrlimit 8 -1 -1
 
     # CMDQ
-    chmod 0644 /dev/mtk_cmdq
+    chmod 0640 /dev/mtk_cmdq
     chown system system /dev/mtk_cmdq
 
+    # MDP
+    chmod 0640 /dev/mtk_mdp
+    chown system system /dev/mtk_mdp
+
     # MDP SYNC
-    chmod 0644 /dev/mdp_sync
+    chmod 0640 /dev/mdp_sync
     chown system system /dev/mdp_sync
 
     #OFFLOAD SERVICE
@@ -375,9 +382,9 @@ on post-fs-data
     chmod 0660 /dev/vcu
     chown media system /dev/vcu
     chmod 0660 /dev/video0
-    chown mediacodec system /dev/video0
+    chown media system /dev/video0
     chmod 0660 /dev/video1
-    chown mediacodec system /dev/video1
+    chown media system /dev/video1
     mkdir /data/vendor/vcodec 0777 media system
     mkdir /data/vendor/vcodec/log 0770 media system
     mkdir /data/vendor/vcodec/in 0770 media system
@@ -544,6 +551,7 @@ on post-fs-data
 
     #Camera
     chmod 0660 /dev/camera-sysram
+    chmod 0660 /dev/camera-mem
     chmod 0660 /dev/camera-isp
     chmod 0660 /dev/camera-dip
     chmod 0660 /dev/camera-tsf
@@ -566,6 +574,7 @@ on post-fs-data
     chmod 0660 /dev/vpu
 
     chown system camera /dev/camera-sysram
+    chown system camera /dev/camera-mem
     chown system camera /dev/camera-isp
     chown system camera /dev/camera-dip
     chown system camera /dev/camera-dpe
@@ -694,7 +703,7 @@ on early-boot
 on boot
     write /proc/bootprof "INIT:boot"
 
-    write /proc/sys/vm/dirty_writeback_centisecs 300
+    write /proc/sys/vm/dirty_writeback_centisecs 500
     chmod 0660 /sys/power/autosleep
 
     chmod 0664 /sys/class/leds/lcd-backlight/brightness
@@ -925,31 +934,8 @@ on property:sys.boot_completed=1
     write /sys/block/dm-4/queue/read_ahead_kb 128
     write /sys/block/dm-5/queue/read_ahead_kb 128
 
-# start EAS+
 on property:sys.boot_completed=1
 
-    write /sys/devices/system/cpu/eas/enable 2
-    write /proc/cpufreq/cpufreq_sched_disable 0
-    chown system system /dev/stune/foreground/schedtune.prefer_idle
-    chown system system /dev/stune/top-app/schedtune.prefer_idle
-    chown system system /dev/stune/rt/schedtune.prefer_idle
-    write /dev/stune/foreground/schedtune.prefer_idle 0
-    write /dev/stune/top-app/schedtune.prefer_idle 0
-    write /dev/stune/rt/schedtune.prefer_idle 0
-    write /proc/sys/kernel/sched_migration_cost_ns 200000
-
-    # restore perf. parameters
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "0 0"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "1 0"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "2 0"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/boot_boost "3 0"
-    write /proc/perfmgr/boost_ctrl/eas_ctrl/sched_stune_task_thresh -1
-    write /proc/perfmgr/boost_ctrl/cpu_ctrl/boot_freq "-1 -1 -1 -1"
-    write /sys/devices/platform/10012000.dvfsrc/helio-dvfsrc/dvfsrc_req_ddr_opp -1
-
-    # switch to sched-dvfs
-    write /sys/devices/system/cpu/cpufreq/policy0/scaling_governor "schedutil"
-    write /sys/devices/system/cpu/cpufreq/policy6/scaling_governor "schedutil"
     # Stop bootprof
     write /proc/bootprof "0"
 
@@ -1040,6 +1026,10 @@ on property:sys.boot_completed=1 && property:ro.boot.atm=enable
 # reset mdmode when modem crash happens in ATM
 on property:vendor.mtk.md1.status=reset
     setprop persist.vendor.atm.mdmode normal
+
+# MTK fast charging support
+on property:persist.vendor.mediatek.fast_charging.support=*
+    write /sys/devices/platform/charger/fast_chg_indicator ${persist.vendor.mediatek.fast_charging.support}
 
 # FPSGO FBT Game
 on boot
